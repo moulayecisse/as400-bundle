@@ -1,0 +1,7 @@
+services:
+    # Data Collector (only in dev/test environment)
+    Cisse\Bundle\As400\DataCollector\As400DataCollector:
+        arguments:
+            - '@Cisse\Bundle\As400\DataCollector\As400QueryLogger'
+        tags:
+            - { name: 'data_collector', template: '@As400/data_collector/as400.html.twig', id: 'as400', priority: 255 }

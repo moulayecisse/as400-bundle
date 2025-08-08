@@ -1,0 +1,39 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    Cisse\Bundle\As400\:
+        resource: '../../*'
+        exclude:
+            - '../../DependencyInjection/'
+            - '../../Resources/'
+            - '../../As400Bundle.php'
+
+    # Connection
+    Cisse\Bundle\As400\Database\Connection\As400Connection:
+        arguments:
+            $driver: '%as400.connection.driver%'
+            $commitMode: '%as400.connection.commit_mode%'
+            $extendedDynamic: '%as400.connection.extended_dynamic%'
+            $packageLibrary: '%as400.connection.package_library%'
+            $translateHex: '%as400.connection.translate_hex%'
+            $system: '%as400.connection.system%'
+            $database: '%as400.connection.database%'
+            $defaultLibraries: '%as400.connection.default_libraries%'
+            $user: '%as400.connection.user%'
+            $password: '%as400.connection.password%'
+
+    # Query Logger (always available)
+    Cisse\Bundle\As400\DataCollector\As400QueryLogger:
+        arguments:
+            - '@logger'
+
+    # Aliases for easier access
+    as400.connection:
+        alias: Cisse\Bundle\As400\Database\Connection\As400Connection
+        public: true
+
+    as400.repository:
+        alias: Cisse\Bundle\As400\Repository\Repository
+        public: true

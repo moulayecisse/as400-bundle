@@ -1,0 +1,127 @@
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
+
+{% block toolbar %}
+    {% set count = collector.queryCount %}
+    {% if count > 0 %}
+        {% set icon %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 32 32">
+                <path fill="currentColor" d="M31.358 22H22.96v-2.329l3.654-3.127c1.326-1.14 1.785-1.802 1.785-2.805V13.5c0-.901-.799-1.36-1.564-1.36c-1.121 0-1.665.765-1.903 1.666l-2.227-.85c.527-1.649 1.904-3.026 4.368-3.026c2.567 0 4.046 1.513 4.046 3.57c0 2.04-1.462 3.28-3.162 4.623l-2.21 1.734h5.61zM12.829 9.421h2.516v5.15h.085c.255-.985 1.24-1.7 2.397-1.7c2.26 0 3.433 1.633 3.433 4.658s-1.173 4.675-3.433 4.675c-1.156 0-2.142-.731-2.397-1.7h-.085V22h-2.516zm5.814 8.89v-1.547c0-1.121-.697-1.852-1.65-1.852s-1.648.493-1.648 1.308v2.635c0 .816.697 1.309 1.649 1.309s1.649-.731 1.649-1.853M1.116 10.135h4.47c3.146 0 5.22 1.989 5.22 5.933S8.731 22 5.585 22h-4.47zm4.47 9.569c1.53 0 2.483-.833 2.483-2.72v-1.836c0-1.886-.952-2.72-2.482-2.72H3.7v7.276z"/>
+            </svg>
+            <span class="sf-toolbar-value">{{ count }}</span>
+            <span class="sf-toolbar-label">AS400</span>
+        {% endset %}
+        {% set text %}
+            <div class="sf-toolbar-info-piece">
+                <b>AS400 Database</b>
+                <span>{{ count }} quer{{ count == 1 ? 'y' : 'ies' }}</span>
+            </div>
+            {% set total_time = collector.totalExecutionTime %}
+            {% if total_time > 0 %}
+            <div class="sf-toolbar-info-piece">
+                <b>Total time</b>
+                <span>{{ total_time }}ms</span>
+            </div>
+            {% endif %}
+            {% for query in collector.queries %}
+            <div class="sf-toolbar-info-piece">
+                <b>Query {{ loop.index }}</b>
+                <span data-tooltip="{{ query.query }}">
+                    {{ query.query|u.truncate(40, '...') }}
+                    {% if query.execution_time is defined and query.execution_time is not null %}
+                        ({{ query.execution_time }}ms)
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        {% endset %}
+
+        {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', { 
+            link: profiler_url, 
+            status: 'normal'
+        }) }}
+    {% endif %}
+{% endblock %}
+
+{% block menu %}
+    {% if collector.queryCount > 0 %}
+        <span class="label">
+            <span class="icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="5em" height="1em" viewBox="0 0 32 32"><path fill="currentColor" d="M31.358 22H22.96v-2.329l3.654-3.127c1.326-1.14 1.785-1.802 1.785-2.805V13.5c0-.901-.799-1.36-1.564-1.36c-1.121 0-1.665.765-1.903 1.666l-2.227-.85c.527-1.649 1.904-3.026 4.368-3.026c2.567 0 4.046 1.513 4.046 3.57c0 2.04-1.462 3.28-3.162 4.623l-2.21 1.734h5.61zM12.829 9.421h2.516v5.15h.085c.255-.985 1.24-1.7 2.397-1.7c2.26 0 3.433 1.633 3.433 4.658s-1.173 4.675-3.433 4.675c-1.156 0-2.142-.731-2.397-1.7h-.085V22h-2.516zm5.814 8.89v-1.547c0-1.121-.697-1.852-1.65-1.852s-1.648.493-1.648 1.308v2.635c0 .816.697 1.309 1.649 1.309s1.649-.731 1.649-1.853M1.116 10.135h4.47c3.146 0 5.22 1.989 5.22 5.933S8.731 22 5.585 22h-4.47zm4.47 9.569c1.53 0 2.483-.833 2.483-2.72v-1.836c0-1.886-.952-2.72-2.482-2.72H3.7v7.276z"/></svg>
+            </span>
+            <strong>AS400</strong>
+            <span class="count">{{ collector.queryCount }}</span>
+        </span>
+    {% endif %}
+{% endblock %}
+
+{% block panel %}
+    <h2>AS400 Queries ({{ collector.queryCount }})</h2>
+    
+    {% if collector.collectedAt %}
+    <p><strong>Data collected at:</strong> {{ collector.collectedAt|date('Y-m-d H:i:s') }}</p>
+    {% endif %}
+    
+    {% if collector.queries|length > 0 %}
+        {% set total_time = collector.totalExecutionTime %}
+        {% if total_time > 0 %}
+            <p><strong>Total execution time:</strong> 
+                {% if total_time < 1 %}
+                    <span style="color: #28a745;">{{ total_time }}ms</span>
+                {% elseif total_time < 100 %}
+                    <span style="color: #ffc107;">{{ total_time }}ms</span>
+                {% else %}
+                    <span style="color: #dc3545;">{{ total_time }}ms</span>
+                {% endif %}
+            </p>
+        {% endif %}
+    {% endif %}
+    
+    {% if collector.queries|length == 0 %}
+        <div class="empty">
+            <p>No AS400 queries were executed during this request.</p>
+            <p><strong>Debug info:</strong></p>
+            <ul>
+                <li>Data collector is working (you can see this panel)</li>
+                <li>Check if AS400 connection is being used</li>
+                <li>Verify query logger is being called</li>
+            </ul>
+        </div>
+    {% else %}
+        <table class="alt">
+            <thead>
+                <tr>
+                    <th>Query</th>
+                    <th>Parameters</th>
+                    <th>Execution Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for query in collector.queries %}
+                    <tr>
+                        <td><code>{{ query.query }}</code></td>
+                        <td>
+                            {% if query.params is empty %}
+                                <em>No parameters</em>
+                            {% else %}
+                                <code>{{ query.params|json_encode }}</code>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if query.execution_time is defined and query.execution_time is not null %}
+                                {% if query.execution_time < 1 %}
+                                    <span style="color: #28a745;">{{ query.execution_time }}ms</span>
+                                {% elseif query.execution_time < 100 %}
+                                    <span style="color: #ffc107;">{{ query.execution_time }}ms</span>
+                                {% else %}
+                                    <span style="color: #dc3545;">{{ query.execution_time }}ms</span>
+                                {% endif %}
+                            {% else %}
+                                <span style="color: #6c757d;">Unknown</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}
