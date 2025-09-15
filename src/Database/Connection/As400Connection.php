@@ -7,6 +7,7 @@ use Cisse\Bundle\As400\Exception\As400Exception;
 use Cisse\Bundle\As400\Utility\As400Utility;
 use PDO;
 use PDOException;
+use Psr\Log\LoggerInterface;
 use SensitiveParameter;
 
 readonly class As400Connection implements ConnectionInterface
@@ -14,6 +15,7 @@ readonly class As400Connection implements ConnectionInterface
     public PDO $connection;
 
     public function __construct(
+        protected LoggerInterface  $as400Logger,
         private As400QueryLogger $queryLogger,
         private string $driver,
         private string $commitMode,

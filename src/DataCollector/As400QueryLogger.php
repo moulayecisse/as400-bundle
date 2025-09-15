@@ -14,9 +14,9 @@ class As400QueryLogger
     {
     }
 
-    public function logQuery(string $query, array $params = [], float $executionTime = null): void
+    public function logQuery(string $query, array|null $params = [], float $executionTime = null): void
     {
-        $this->logger->info('AS400 Query: ' . $query, $params);
+        $this->logger->info('AS400 Query: ' . $query, $params ?? []);
 
         $this->queries[] = [
             'query' => $query,
@@ -26,9 +26,11 @@ class As400QueryLogger
         ];
     }
 
-    public function startQuery(string $query, array $params = []): int
+    public function startQuery(string $query, array|null $params = []): int
     {
+        $this->logger->info('AS400 Query: ' . $query, $params ?? []);
         $queryIndex = count($this->queries);
+
         $this->queries[] = [
             'query' => $query,
             'params' => $params,
