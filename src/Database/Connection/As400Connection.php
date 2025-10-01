@@ -4,6 +4,7 @@ namespace Cisse\Bundle\As400\Database\Connection;
 
 use Cisse\Bundle\As400\DataCollector\As400QueryLogger;
 use Cisse\Bundle\As400\Exception\As400Exception;
+use Cisse\Bundle\As400\Service\DataRecorder\DataRecorder;
 use Cisse\Bundle\As400\Utility\As400Utility;
 use PDO;
 use PDOException;
@@ -15,23 +16,27 @@ readonly class As400Connection implements ConnectionInterface
     public PDO $connection;
 
     public function __construct(
-        protected LoggerInterface  $as400Logger,
-        private As400QueryLogger $queryLogger,
-        private string $driver,
-        private string $commitMode,
-        private string $extendedDynamic,
-        private string $packageLibrary,
-        private string $translateHex,
-        private string $system,
-        private string $database,
-        private string $defaultLibraries,
-        private string $user,
+        protected LoggerInterface            $as400Logger,
+        private As400QueryLogger             $queryLogger,
+        private DataRecorder                 $dataRecorder,
+        private string                       $driver,
+        private string                       $commitMode,
+        private string                       $extendedDynamic,
+        private string                       $packageLibrary,
+        private string                       $translateHex,
+        private string                       $system,
+        private string                       $database,
+        private string                       $defaultLibraries,
+        private string                       $user,
         #[SensitiveParameter] private string $password,
     )
     {
         $this->connect();
     }
 
+    /**
+     * @throws As400Exception
+     */
     public function insert(string $table, array $data): bool
     {
         if (empty($data)) {
@@ -44,7 +49,12 @@ readonly class As400Connection implements ConnectionInterface
         $placeholders = implode(', ', $placeholders);
         $query = "INSERT INTO $table ($fields) VALUES ($placeholders)";
 
-        return $this->executeWithTransaction($query, $values);
+        $result = $this->executeWithTransaction($query, $values);
+        if ($result && count($this->dataRecorder->getRecorders())) {
+            $this->dataRecorder->insert($table, $data);
+        }
+
+        return $result;
     }
 
     /**
@@ -75,7 +85,22 @@ readonly class As400Connection implements ConnectionInterface
         $query = "UPDATE $table SET $setStatements$whereClause";
         $params = array_merge($values, $conditionParams);
 
-        return $this->executeWithTransaction($query, $params);
+        $oldData = [];
+        if (count($this->dataRecorder->getRecorders())){
+            $oldData = $this->select($table, array_keys($data), $conditions);
+            if (count($oldData) === 1) {
+                $oldData = $oldData[0];
+            } else {
+                $oldData = [];
+            }
+        }
+        $result = $this->executeWithTransaction($query, $params);
+
+        if ($result && count($this->dataRecorder->getRecorders())) {
+            $this->dataRecorder->update($table, $data, $oldData, $conditions);
+        }
+
+        return $result;
     }
 
     /**
@@ -88,21 +113,31 @@ readonly class As400Connection implements ConnectionInterface
         $query = "DELETE FROM $table$whereClause";
 
         $this->queryLogger->logQuery($query, $params);
+        $oldData = [];
+
+        if (count($this->dataRecorder->getRecorders())){
+            $oldData = $this->select($table, null, $conditions);
+        }
 
         try {
             $this->connection->beginTransaction();
 
-                $stmt = $this->connection->prepare($query);
+            $stmt = $this->connection->prepare($query);
             $result = $stmt->execute($params);
-                $affectedRows = $stmt->rowCount();
+            $affectedRows = $stmt->rowCount();
 
             if ($result && $affectedRows > 0) {
                 $this->connection->commit();
+
+                if (count($this->dataRecorder->getRecorders())) {
+                    $this->dataRecorder->delete($table, $oldData, $conditions);
+                }
+
                 return true;
             }
 
-                $this->connection->rollBack();
-                return false;
+            $this->connection->rollBack();
+            return false;
         } catch (PDOException $e) {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();
@@ -322,21 +357,20 @@ readonly class As400Connection implements ConnectionInterface
 
         $orderParts = [];
 
-    foreach ($orders as $key => $value) {
-        if (is_string($key)) {
-            $orderParts[] = "$key " . strtoupper($value);
-        }
-        else if (is_array($value)) {
-            foreach ($value as $subKey => $subValue) {
-                $orderParts[] = "$subKey " . strtoupper($subValue);
+        foreach ($orders as $key => $value) {
+            if (is_string($key)) {
+                $orderParts[] = "$key " . strtoupper($value);
+            } elseif (is_array($value)) {
+                foreach ($value as $subKey => $subValue) {
+                    $orderParts[] = "$subKey " . strtoupper($subValue);
+                }
+            } elseif (is_string($value)) {
+                // Try to extract field and direction from string
+                $parts = preg_split('/\s+/', trim($value));
+                $field = $parts[0] ?? '';
+                $direction = strtoupper($parts[1] ?? 'ASC');
+                $orderParts[] = "$field $direction";
             }
-        } elseif (is_string($value)) {
-            // Try to extract field and direction from string
-            $parts = preg_split('/\s+/', trim($value));
-            $field = $parts[0] ?? '';
-            $direction = strtoupper($parts[1] ?? 'ASC');
-            $orderParts[] = "$field $direction";
-        }
         }
 
         return ' ORDER BY ' . implode(', ', $orderParts);
