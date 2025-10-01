@@ -45,6 +45,12 @@ as400:
         translate_hex: "1"                  # Optional, default: "1"
         database: ""                        # Optional
         default_libraries: "LIB1,LIB2"      # Optional, comma-separated
+
+    generator:                              # Optional: Configure entity generation paths
+        entity_dir: "src/Entity/As400"              # Default: src/Entity/As400
+        repository_dir: "src/Repository/As400"      # Default: src/Repository/As400
+        entity_namespace: "App\\Entity\\As400"      # Default: App\Entity\As400
+        repository_namespace: "App\\Repository\\As400"  # Default: App\Repository\As400
 ```
 
 ## Usage

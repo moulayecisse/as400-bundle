@@ -46,6 +46,13 @@ as400:
         translate_hex: '%env(DATABASE_AS400_TRANSLATE_HEX)%'
         database: '%env(DATABASE_AS400_DATABASE)%'
         default_libraries: '%env(DATABASE_AS400_DEFAULT_LIBRARIES)%'
+
+    # Optional: Configure entity generation paths (defaults shown)
+    generator:
+        entity_dir: 'src/Entity/As400'
+        repository_dir: 'src/Repository/As400'
+        entity_namespace: 'App\Entity\As400'
+        repository_namespace: 'App\Repository\As400'
 ```
 
 ## 4. Update Your Existing Code
@@ -172,9 +179,27 @@ public function test(As400Connection $connection)
 }
 ```
 
+## 9. Generate Entities
+
+Use the command to generate entities from AS400 tables:
+
+```bash
+# Generate entity from table
+php bin/console as400:generate:entity MYLIB CUSTOMERS
+
+# Generate entity with repository
+php bin/console as400:generate:entity MYLIB CUSTOMERS --with-repository
+
+# Override default namespace (optional)
+php bin/console as400:generate:entity MYLIB CUSTOMERS "App\\Entity\\Custom"
+```
+
+The command will use the configured paths from `as400.yaml` (or defaults if not configured) to determine where to generate files in your project.
+
 ## Notes
 
 - The bundle maintains backward compatibility with your existing code structure
 - All environment variables remain the same
 - The Web Profiler integration will automatically show AS400 queries
-- You can now use the `as400:generate:entity` command with the new bundle
+- Entity generation now uses your project's configured paths, not the bundle directory
+- You can customize entity/repository output directories via the `generator` configuration section

@@ -28,6 +28,15 @@ class Configuration implements ConfigurationInterface
                         ->scalarNode('default_libraries')->defaultValue('')->end()
                     ->end()
                 ->end()
+                ->arrayNode('generator')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->scalarNode('entity_dir')->defaultValue('src/Entity/As400')->end()
+                        ->scalarNode('repository_dir')->defaultValue('src/Repository/As400')->end()
+                        ->scalarNode('entity_namespace')->defaultValue('App\\Entity\\As400')->end()
+                        ->scalarNode('repository_namespace')->defaultValue('App\\Repository\\As400')->end()
+                    ->end()
+                ->end()
             ->end();
 
         return $treeBuilder;

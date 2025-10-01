@@ -20,7 +20,12 @@ use Symfony\Component\Filesystem\Filesystem;
 class As400GenerateEntityCommand extends Command
 {
     public function __construct(
-        private readonly As400Connection $connection
+        private readonly As400Connection $connection,
+        private readonly string $projectDir,
+        private readonly string $entityDir,
+        private readonly string $repositoryDir,
+        private readonly string $entityNamespace,
+        private readonly string $repositoryNamespace,
     )
     {
         parent::__construct();
@@ -31,7 +36,7 @@ class As400GenerateEntityCommand extends Command
         $this
             ->addArgument('database', InputArgument::OPTIONAL, 'AS400 schema/database name')
             ->addArgument('table', InputArgument::OPTIONAL, 'AS400 table name')
-            ->addArgument('output-namespace', InputArgument::OPTIONAL, 'Target namespace for generated entities', 'App\\Entity\\As400')
+            ->addArgument('output-namespace', InputArgument::OPTIONAL, 'Target namespace for generated entities (overrides config)', null)
             ->addOption('with-repository', null, InputOption::VALUE_NONE, 'Generate associated repository');
     }
 
@@ -44,7 +49,7 @@ class As400GenerateEntityCommand extends Command
 
         $db = strtoupper($input->getArgument('database'));
         $table = strtoupper($input->getArgument('table'));
-        $outputNamespace = $input->getArgument('output-namespace');
+        $outputNamespace = $input->getArgument('output-namespace') ?? $this->entityNamespace;
         $withRepo = $input->getOption('with-repository');
 
         if (!$db || !$table) {
@@ -62,9 +67,8 @@ class As400GenerateEntityCommand extends Command
         $className = str_replace(' ', '', ucwords(strtolower(str_replace('_', ' ', $table))));
         $namespace = "$outputNamespace\\$db";
 
-        // Create path based on namespace structure
-        $namespaceParts = explode('\\', str_replace('App\\', '', $namespace));
-        $entityPath = __DIR__ . '/../../../../src/' . implode('/', $namespaceParts) . '/' . $className . '.php';
+        // Create path based on configured directory and project root
+        $entityPath = $this->projectDir . '/' . $this->entityDir . '/' . $db . '/' . $className . '.php';
 
         $constants = array_reduce($columns, static fn($carry, $col) => $carry . "    const string " . strtoupper($col['COLUMN_NAME']) . " = '" . strtoupper($col['COLUMN_NAME']) . "';\n",
             ''
@@ -90,11 +94,12 @@ class As400GenerateEntityCommand extends Command
         $filesystem->mkdir(dirname($entityPath));
 
         file_put_contents($entityPath, $entityContent);
-        $io->success("Entity generated at: $entityPath");
+        $entityRelativePath = str_replace($this->projectDir . '/', '', $entityPath);
+        $io->success("Entity generated at: $entityRelativePath");
 
         if ($withRepo) {
-            $repoNamespace = str_replace('Entity', 'Repository', $namespace);
-            $repoPath = str_replace('Entity', 'Repository', dirname($entityPath)) . "/{$className}Repository.php";
+            $repoNamespace = $this->repositoryNamespace . '\\' . $db;
+            $repoPath = $this->projectDir . '/' . $this->repositoryDir . '/' . $db . '/' . $className . 'Repository.php';
 
             $repoContent = $this->renderTemplate(
                 __DIR__ . '/../Resources/templates/as400/repository.tpl.php',
@@ -107,7 +112,8 @@ class As400GenerateEntityCommand extends Command
 
             $filesystem->mkdir(dirname($repoPath));
             file_put_contents($repoPath, $repoContent);
-            $io->success("Repository generated at: $repoPath");
+            $repoRelativePath = str_replace($this->projectDir . '/', '', $repoPath);
+            $io->success("Repository generated at: $repoRelativePath");
         }
 
         return Command::SUCCESS;

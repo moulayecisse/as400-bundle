@@ -31,6 +31,13 @@ class As400Extension extends Extension implements PrependExtensionInterface
                 $container->setParameter("as400.connection.{$key}", $value);
             }
         }
+
+        // Set generator parameters
+        if (isset($config['generator'])) {
+            foreach ($config['generator'] as $key => $value) {
+                $container->setParameter("as400.generator.{$key}", $value);
+            }
+        }
     }
 
     public function getAlias(): string
