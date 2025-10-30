@@ -196,3 +196,4 @@ class Repository
         return new ReflectionClass(static::ENTITY_CLASS);
     }
 }
+
