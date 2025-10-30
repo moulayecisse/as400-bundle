@@ -35,15 +35,19 @@ class Repository
             );
 
             if ($inserted) {
-                $lastId = (int) $this->connection->connection->lastInsertId();
-                $lastId = $lastId > 0 ? $lastId : $this->connection->fetchColumn("SELECT MAX({$this->getIdentifier()}) FROM {$this->getTableName()}");
+                try {
+                    $lastId = (int) $this->connection->connection->lastInsertId();
+                    $lastId = $lastId > 0 ? $lastId : $this->connection->fetchColumn("SELECT MAX({$this->getIdentifier()}) FROM {$this->getTableName()}");
 
-                if ($lastId > 0) {
-                    $this->logger->info("Inserted new record into {$this->getTableName()} with ID: $lastId");
-                    return $lastId;
+                    if ($lastId > 0) {
+                        $this->logger->info("Inserted new record into {$this->getTableName()} with ID: $lastId");
+                        return $lastId;
+                    }
+
+                    $this->logger->warning("Insert operation did not return a valid ID for table {$this->getTableName()}");
+                } catch (Exception $e) {
+                    $this->logger->warning("Failed to retrieve last insert ID for table {$this->getTableName()}: " . $e->getMessage());
                 }
-
-                $this->logger->warning("Insert operation did not return a valid ID for table {$this->getTableName()}");
             }
 
             return $inserted;
