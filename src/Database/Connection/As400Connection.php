@@ -326,18 +326,14 @@ readonly class As400Connection implements ConnectionInterface
 
         foreach ($conditions as $key => $value) {
             if (is_int($key)) {
-                // Raw condition string
                 $whereParts[] = $value;
+            } else if (is_array($value)) {
+                $placeholders = str_repeat('?,', count($value) - 1) . '?';
+                $whereParts[] = "$key IN ($placeholders)";
+                $params = array_merge($params, $value);
             } else {
-                // Key-value pair
-                if (is_array($value)) {
-                    $placeholders = str_repeat('?,', count($value) - 1) . '?';
-                    $whereParts[] = "$key IN ($placeholders)";
-                    $params = array_merge($params, $value);
-                } else {
-                    $whereParts[] = "$key = ?";
-                    $params[] = $value;
-                }
+                $whereParts[] = "$key = ?";
+                $params[] = $value;
             }
         }
 

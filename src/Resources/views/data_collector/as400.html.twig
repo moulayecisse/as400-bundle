@@ -13,7 +13,7 @@
         {% set text %}
             <div class="sf-toolbar-info-piece">
                 <b>AS400 Database</b>
-                <span>{{ count }} quer{{ count == 1 ? 'y' : 'ies' }}</span>
+                <span>{{ count }} {{ count == 1 ? 'query' : 'queries' }}</span>
             </div>
             {% set total_time = collector.totalExecutionTime %}
             {% if total_time > 0 %}
@@ -82,7 +82,7 @@
             <p><strong>Debug info:</strong></p>
             <ul>
                 <li>Data collector is working (you can see this panel)</li>
-                <li>Check if AS400 connection is being used</li>
+                <li>Check if the AS400 connection is being used</li>
                 <li>Verify query logger is being called</li>
             </ul>
         </div>

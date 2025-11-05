@@ -14,7 +14,7 @@ class As400QueryLogger
     {
     }
 
-    public function logQuery(string $query, array|null $params = [], float $executionTime = null): void
+    public function logQuery(string $query, array|null $params = [], float|null $executionTime = null): void
     {
         $this->logger->info('AS400 Query: ' . $query, $params ?? []);
 

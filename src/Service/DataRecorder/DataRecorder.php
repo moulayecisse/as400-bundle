@@ -14,7 +14,7 @@ class DataRecorder
         readonly private iterable $recorderServices,
     )
     {
-        foreach ($recorderServices as $recorder) {
+        foreach ($this->recorderServices as $recorder) {
             $this->recorders[] = $recorder;
         }
     }

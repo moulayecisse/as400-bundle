@@ -2,6 +2,7 @@
 
 namespace Cisse\Bundle\As400\DataCollector;
 
+use DateTime;
 use Symfony\Component\HttpKernel\DataCollector\DataCollector;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,7 +26,7 @@ class As400DataCollector extends DataCollector
         $this->data = [
             'queries' => $queries,
             'query_count' => count($queries),
-            'collected_at' => new \DateTime(),
+            'collected_at' => new DateTime(),
             'request_uri' => $request->getRequestUri(),
         ];
     }
@@ -50,7 +51,7 @@ class As400DataCollector extends DataCollector
         return $this->data['query_count'] ?? 0;
     }
 
-    public function getCollectedAt(): ?\DateTime
+    public function getCollectedAt(): DateTime|null
     {
         return $this->data['collected_at'] ?? null;
     }
@@ -64,7 +65,7 @@ class As400DataCollector extends DataCollector
     {
         $totalTime = 0;
         foreach ($this->getQueries() as $query) {
-            if (isset($query['execution_time']) && $query['execution_time'] !== null) {
+            if (!empty($query['execution_time'])) {
                 $totalTime += $query['execution_time'];
             }
         }

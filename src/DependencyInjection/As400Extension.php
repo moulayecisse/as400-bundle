@@ -19,23 +19,24 @@ class As400Extension extends Extension implements PrependExtensionInterface
         $loader->load('services.yaml');
 
         // Load dev-specific services
-        if (in_array($container->getParameter('kernel.environment'), ['dev', 'test'], true)) {
-            if (file_exists(__DIR__ . '/../Resources/config/services_dev.yaml')) {
-                $loader->load('services_dev.yaml');
-            }
+        if (
+            file_exists(__DIR__ . '/../Resources/config/services_dev.yaml')
+            && in_array($container->getParameter('kernel.environment'), ['dev', 'test'], true)
+        ) {
+            $loader->load('services_dev.yaml');
         }
 
         // Set connection parameters
         if (isset($config['connection'])) {
             foreach ($config['connection'] as $key => $value) {
-                $container->setParameter("as400.connection.{$key}", $value);
+                $container->setParameter("as400.connection.$key", $value);
             }
         }
 
         // Set generator parameters
         if (isset($config['generator'])) {
             foreach ($config['generator'] as $key => $value) {
-                $container->setParameter("as400.generator.{$key}", $value);
+                $container->setParameter("as400.generator.$key", $value);
             }
         }
     }

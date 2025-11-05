@@ -36,7 +36,7 @@ class As400GenerateEntityCommand extends Command
         $this
             ->addArgument('database', InputArgument::OPTIONAL, 'AS400 schema/database name')
             ->addArgument('table', InputArgument::OPTIONAL, 'AS400 table name')
-            ->addArgument('output-namespace', InputArgument::OPTIONAL, 'Target namespace for generated entities (overrides config)', null)
+            ->addArgument('output-namespace', InputArgument::OPTIONAL, 'Target namespace for generated entities (overrides config)')
             ->addOption('with-repository', null, InputOption::VALUE_NONE, 'Generate associated repository');
     }
 
@@ -67,7 +67,7 @@ class As400GenerateEntityCommand extends Command
         $className = str_replace(' ', '', ucwords(strtolower(str_replace('_', ' ', $table))));
         $namespace = "$outputNamespace\\$db";
 
-        // Create path based on configured directory and project root
+        // Create the path based on configured directory and project root
         $entityPath = $this->projectDir . '/' . $this->entityDir . '/' . $db . '/' . $className . '.php';
 
         $constants = array_reduce($columns, static fn($carry, $col) => $carry . "    const string " . strtoupper($col['COLUMN_NAME']) . " = '" . strtoupper($col['COLUMN_NAME']) . "';\n",
