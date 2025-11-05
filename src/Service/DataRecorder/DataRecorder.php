@@ -3,14 +3,15 @@
 namespace Cisse\Bundle\As400\Service\DataRecorder;
 
 use Cisse\Bundle\As400\Enum\DataRecordType;
-use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 class DataRecorder
 {
     private array $recorders = [];
 
     public function __construct(
-        #[TaggedIterator(DataRecorderInterface::class)] private iterable $recorderServices,
+        #[AutowireIterator(DataRecorderInterface::class)]
+        readonly private iterable $recorderServices,
     )
     {
         foreach ($recorderServices as $recorder) {
