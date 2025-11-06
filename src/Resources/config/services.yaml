@@ -29,6 +29,17 @@ services:
         arguments:
             - '@logger'
 
+    # Schema Mapper - Initializes schema mapping from configuration
+    Cisse\Bundle\As400\Service\SchemaMapper:
+        public: true
+        arguments:
+            $schemaMapping: '%as400.schema_mapping%'
+
+    # Alias for easier access
+    as400.schema_mapper:
+        alias: Cisse\Bundle\As400\Service\SchemaMapper
+        public: true
+
     # Command
     Cisse\Bundle\As400\Command\As400GenerateEntityCommand:
         arguments:

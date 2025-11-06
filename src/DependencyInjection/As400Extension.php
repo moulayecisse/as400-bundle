@@ -33,6 +33,10 @@ class As400Extension extends Extension implements PrependExtensionInterface
             }
         }
 
+        // Set schema mapping parameter (default to empty array if not set)
+        $schemaMapping = $config['connection']['schema_mapping'] ?? [];
+        $container->setParameter('as400.schema_mapping', $schemaMapping);
+
         // Set generator parameters
         if (isset($config['generator'])) {
             foreach ($config['generator'] as $key => $value) {
