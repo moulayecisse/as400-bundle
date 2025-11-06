@@ -18,7 +18,7 @@ class As400QueryLogger
 
     public function logQuery(string $query, array|null $params = [], float|null $executionTime = null): void
     {
-        if ($this->appEnv !== 'prod') {
+        if ($this->appEnv === 'dev') {
             $this->logger->info('AS400 Query: ' . $query, $params ?? []);
         }
 
@@ -32,7 +32,7 @@ class As400QueryLogger
 
     public function startQuery(string $query, array|null $params = []): int
     {
-        if ($this->appEnv !== 'prod') {
+        if ($this->appEnv === 'dev') {
             $this->logger->info('AS400 Query: ' . $query, $params ?? []);
         }
         $queryIndex = count($this->queries);

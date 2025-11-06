@@ -42,7 +42,7 @@ class Repository
                     $lastId = $lastId > 0 ? $lastId : $this->connection->fetchColumn("SELECT MAX({$this->getIdentifier()}) FROM {$this->getTableName()}");
 
                     if ($lastId > 0) {
-                        if ($this->appEnv !== 'prod') {
+                        if ($this->appEnv === 'dev') {
                             $this->logger->info("Inserted new record into {$this->getTableName()} with ID: $lastId");
                         }
                         return $lastId;
