@@ -13,15 +13,17 @@ use Exception;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
 use ReflectionException;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class Repository
 {
     protected const string ENTITY_CLASS = '';
 
     public function __construct(
-        protected LoggerInterface  $logger,
-        protected As400Connection  $connection,
-        protected As400QueryLogger $queryLogger,
+        protected LoggerInterface                               $logger,
+        protected As400Connection                               $connection,
+        protected As400QueryLogger                              $queryLogger,
+        #[Autowire('%env(APP_ENV)%')] protected readonly string $appEnv,
     )
     {
     }
@@ -29,18 +31,20 @@ class Repository
     public function insert(array $data): bool|int
     {
         try {
-            $inserted =  $this->connection->insert(
+            $inserted = $this->connection->insert(
                 $this->getTableName(),
                 $data
             );
 
             if ($inserted) {
                 try {
-                    $lastId = (int) $this->connection->connection->lastInsertId();
+                    $lastId = (int)$this->connection->connection->lastInsertId();
                     $lastId = $lastId > 0 ? $lastId : $this->connection->fetchColumn("SELECT MAX({$this->getIdentifier()}) FROM {$this->getTableName()}");
 
                     if ($lastId > 0) {
-                        $this->logger->info("Inserted new record into {$this->getTableName()} with ID: $lastId");
+                        if ($this->appEnv !== 'prod') {
+                            $this->logger->info("Inserted new record into {$this->getTableName()} with ID: $lastId");
+                        }
                         return $lastId;
                     }
 

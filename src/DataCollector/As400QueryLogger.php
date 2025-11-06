@@ -3,20 +3,24 @@
 namespace Cisse\Bundle\As400\DataCollector;
 
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class As400QueryLogger
 {
     public array $queries = [];
 
     public function __construct(
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface                        $logger,
+        #[Autowire('%env(APP_ENV)%')] protected readonly string $appEnv,
     )
     {
     }
 
     public function logQuery(string $query, array|null $params = [], float|null $executionTime = null): void
     {
-        $this->logger->info('AS400 Query: ' . $query, $params ?? []);
+        if ($this->appEnv !== 'prod') {
+            $this->logger->info('AS400 Query: ' . $query, $params ?? []);
+        }
 
         $this->queries[] = [
             'query' => $query,
@@ -28,7 +32,9 @@ class As400QueryLogger
 
     public function startQuery(string $query, array|null $params = []): int
     {
-        $this->logger->info('AS400 Query: ' . $query, $params ?? []);
+        if ($this->appEnv !== 'prod') {
+            $this->logger->info('AS400 Query: ' . $query, $params ?? []);
+        }
         $queryIndex = count($this->queries);
 
         $this->queries[] = [
