@@ -23,7 +23,7 @@ class Repository
         protected LoggerInterface                               $logger,
         protected As400Connection                               $connection,
         protected As400QueryLogger                              $queryLogger,
-        #[Autowire('%env(APP_ENV)%')] protected readonly string $appEnv,
+        #[Autowire('%env(APP_ENV)%')] protected string $appEnv,
     )
     {
     }
