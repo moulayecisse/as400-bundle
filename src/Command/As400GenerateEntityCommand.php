@@ -24,8 +24,10 @@ class As400GenerateEntityCommand extends Command
         private readonly string $projectDir,
         private readonly string $entityDir,
         private readonly string $repositoryDir,
+        private readonly string $testDir,
         private readonly string $entityNamespace,
         private readonly string $repositoryNamespace,
+        private readonly string $testNamespace,
     )
     {
         parent::__construct();
@@ -37,7 +39,8 @@ class As400GenerateEntityCommand extends Command
             ->addArgument('database', InputArgument::OPTIONAL, 'AS400 schema/database name')
             ->addArgument('table', InputArgument::OPTIONAL, 'AS400 table name')
             ->addArgument('output-namespace', InputArgument::OPTIONAL, 'Target namespace for generated entities (overrides config)')
-            ->addOption('with-repository', null, InputOption::VALUE_NONE, 'Generate associated repository');
+            ->addOption('with-repository', null, InputOption::VALUE_NONE, 'Generate associated repository')
+            ->addOption('with-test', null, InputOption::VALUE_NONE, 'Generate associated PHPUnit test');
     }
 
     /**
@@ -51,6 +54,7 @@ class As400GenerateEntityCommand extends Command
         $table = strtoupper($input->getArgument('table'));
         $outputNamespace = $input->getArgument('output-namespace') ?? $this->entityNamespace;
         $withRepo = $input->getOption('with-repository');
+        $withTest = $input->getOption('with-test');
 
         if (!$db || !$table) {
             $io->error('Please provide a database and table name.');
@@ -116,6 +120,32 @@ class As400GenerateEntityCommand extends Command
             $io->success("Repository generated at: $repoRelativePath");
         }
 
+        if ($withTest) {
+            $testNs = $this->testNamespace . '\\' . $db;
+            $testPath = $this->projectDir . '/' . $this->testDir . '/' . $db . '/' . $className . 'Test.php';
+
+            $testContent = $this->renderTemplate(
+                __DIR__ . '/../Resources/templates/as400/entity_test.tpl.php',
+                [
+                    'testNamespace' => $testNs,
+                    'entityNamespace' => $namespace,
+                    'className' => $className,
+                    'database' => $db,
+                    'table' => $table,
+                    'identifier' => $columns[0]['COLUMN_NAME'] ?? '',
+                    'columnConstantAssertions' => $this->generateColumnConstantAssertions($columns, $className),
+                    'propertySetStatements' => $this->generatePropertySetStatements($columns),
+                    'propertyAssertions' => $this->generatePropertyAssertions($columns),
+                    'nullAssertions' => $this->generateNullAssertions($columns),
+                ]
+            );
+
+            $filesystem->mkdir(dirname($testPath));
+            file_put_contents($testPath, $testContent);
+            $testRelativePath = str_replace($this->projectDir . '/', '', $testPath);
+            $io->success("Test generated at: $testRelativePath");
+        }
+
         return Command::SUCCESS;
     }
 
@@ -126,5 +156,93 @@ class As400GenerateEntityCommand extends Command
             $template = str_replace('{{ ' . $key . ' }}', $value, $template);
         }
         return $template;
+    }
+
+    /**
+     * Generate assertions for column constants (first 5 columns).
+     */
+    private function generateColumnConstantAssertions(array $columns, string $className): string
+    {
+        $assertions = [];
+        $columnsToTest = array_slice($columns, 0, min(5, count($columns)));
+
+        foreach ($columnsToTest as $col) {
+            $colName = strtoupper($col['COLUMN_NAME']);
+            $assertions[] = "        \$this->assertSame('$colName', $className::$colName);";
+        }
+
+        return implode("\n", $assertions);
+    }
+
+    /**
+     * Generate property set statements for tests (first 5 columns).
+     */
+    private function generatePropertySetStatements(array $columns): string
+    {
+        $statements = [];
+        $columnsToTest = array_slice($columns, 0, min(5, count($columns)));
+
+        foreach ($columnsToTest as $col) {
+            $propName = strtolower($col['COLUMN_NAME']);
+            $testValue = $this->generateTestValue($col);
+            $statements[] = "        \$entity->$propName = '$testValue';";
+        }
+
+        return implode("\n", $statements);
+    }
+
+    /**
+     * Generate property assertions for tests (first 5 columns).
+     */
+    private function generatePropertyAssertions(array $columns): string
+    {
+        $assertions = [];
+        $columnsToTest = array_slice($columns, 0, min(5, count($columns)));
+
+        foreach ($columnsToTest as $col) {
+            $propName = strtolower($col['COLUMN_NAME']);
+            $testValue = $this->generateTestValue($col);
+            $assertions[] = "        \$this->assertSame('$testValue', \$entity->$propName);";
+        }
+
+        return implode("\n", $assertions);
+    }
+
+    /**
+     * Generate null assertions for tests (first 5 columns).
+     */
+    private function generateNullAssertions(array $columns): string
+    {
+        $assertions = [];
+        $columnsToTest = array_slice($columns, 0, min(5, count($columns)));
+
+        foreach ($columnsToTest as $col) {
+            $propName = strtolower($col['COLUMN_NAME']);
+            $assertions[] = "        \$this->assertNull(\$entity->$propName);";
+        }
+
+        return implode("\n", $assertions);
+    }
+
+    /**
+     * Generate a test value based on column data type.
+     */
+    private function generateTestValue(array $column): string
+    {
+        $colName = strtoupper($column['COLUMN_NAME']);
+        $dataType = strtoupper($column['DATA_TYPE']);
+
+        // Use meaningful test values based on common column name patterns
+        return match (true) {
+            str_contains($colName, 'DATE') || str_starts_with($colName, 'DT') => '2024-01-15',
+            str_contains($colName, 'EMAIL') => 'test@example.com',
+            str_contains($colName, 'TEL') || str_contains($colName, 'PHONE') => '0123456789',
+            str_contains($colName, 'CODE') => 'CODE01',
+            str_contains($colName, 'ID') => '12345',
+            str_contains($colName, 'NOM') || str_contains($colName, 'NAME') => 'TestName',
+            str_contains($colName, 'LIBEL') => 'Test Label',
+            in_array($dataType, ['INTEGER', 'DECIMAL', 'NUMERIC', 'SMALLINT', 'BIGINT']) => '123',
+            default => 'test_value',
+        };
     }
 }

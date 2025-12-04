@@ -38,8 +38,10 @@ class Configuration implements ConfigurationInterface
                     ->children()
                         ->scalarNode('entity_dir')->defaultValue('src/Entity/As400')->end()
                         ->scalarNode('repository_dir')->defaultValue('src/Repository/As400')->end()
+                        ->scalarNode('test_dir')->defaultValue('tests/Entity/As400')->end()
                         ->scalarNode('entity_namespace')->defaultValue('App\\Entity\\As400')->end()
                         ->scalarNode('repository_namespace')->defaultValue('App\\Repository\\As400')->end()
+                        ->scalarNode('test_namespace')->defaultValue('App\\Tests\\Entity\\As400')->end()
                     ->end()
                 ->end()
             ->end();

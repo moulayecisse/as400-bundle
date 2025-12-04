@@ -40,14 +40,26 @@ services:
         alias: Cisse\Bundle\As400\Service\SchemaMapper
         public: true
 
-    # Command
+    # Commands
     Cisse\Bundle\As400\Command\As400GenerateEntityCommand:
         arguments:
             $projectDir: '%kernel.project_dir%'
             $entityDir: '%as400.generator.entity_dir%'
             $repositoryDir: '%as400.generator.repository_dir%'
+            $testDir: '%as400.generator.test_dir%'
             $entityNamespace: '%as400.generator.entity_namespace%'
             $repositoryNamespace: '%as400.generator.repository_namespace%'
+            $testNamespace: '%as400.generator.test_namespace%'
+
+    Cisse\Bundle\As400\Command\As400GenerateMissingCommand:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+            $entityDir: '%as400.generator.entity_dir%'
+            $repositoryDir: '%as400.generator.repository_dir%'
+            $testDir: '%as400.generator.test_dir%'
+            $entityNamespace: '%as400.generator.entity_namespace%'
+            $repositoryNamespace: '%as400.generator.repository_namespace%'
+            $testNamespace: '%as400.generator.test_namespace%'
 
     # Aliases for easier access
     as400.connection:

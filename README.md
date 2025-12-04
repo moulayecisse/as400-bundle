@@ -49,8 +49,10 @@ as400:
     generator:                              # Optional: Configure entity generation paths
         entity_dir: "src/Entity/As400"              # Default: src/Entity/As400
         repository_dir: "src/Repository/As400"      # Default: src/Repository/As400
+        test_dir: "tests/Entity/As400"              # Default: tests/Entity/As400
         entity_namespace: "App\\Entity\\As400"      # Default: App\Entity\As400
         repository_namespace: "App\\Repository\\As400"  # Default: App\Repository\As400
+        test_namespace: "App\\Tests\\Entity\\As400" # Default: App\Tests\Entity\As400
 ```
 
 ## Usage
@@ -138,9 +140,47 @@ php bin/console as400:generate:entity MYLIB CUSTOMERS
 # Generate entity with repository
 php bin/console as400:generate:entity MYLIB CUSTOMERS --with-repository
 
+# Generate entity with PHPUnit test
+php bin/console as400:generate:entity MYLIB CUSTOMERS --with-test
+
+# Generate entity with both repository and test
+php bin/console as400:generate:entity MYLIB CUSTOMERS --with-repository --with-test
+
 # Generate with custom namespace
 php bin/console as400:generate:entity MYLIB CUSTOMERS "App\\Entity\\AS400"
 ```
+
+The `--with-test` option generates a PHPUnit test file that verifies:
+- Entity constants are correctly defined (DATABASE_NAME, TABLE_NAME, IDENTIFIER_NAME)
+- Column constants match their expected values
+- Properties can be set and retrieved
+- All properties default to null
+
+### Generating Missing Tests/Repositories
+
+Use this command to scan existing entities and generate missing tests and/or repositories:
+
+```bash
+# Generate all missing tests and repositories
+php bin/console as400:generate:missing
+
+# Generate only missing tests
+php bin/console as400:generate:missing --tests
+php bin/console as400:generate:missing -t
+
+# Generate only missing repositories
+php bin/console as400:generate:missing --repositories
+php bin/console as400:generate:missing -r
+
+# Preview what would be generated (dry run)
+php bin/console as400:generate:missing --dry-run
+```
+
+The command will:
+1. Scan all entities in your configured `entity_dir`
+2. Check for corresponding test/repository files
+3. Generate missing files using reflection on existing entities
+4. Display a summary table of generated vs existing files
 
 ### Direct Connection Usage
 
