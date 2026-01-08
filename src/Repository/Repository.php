@@ -114,15 +114,34 @@ class Repository
             $results = $this->connection->select($this->getTableName(), $fields, $criteria, $orderBy, $limit, $offset);
 
             if ($hydrate) {
-                return array_map(/**
-                 * @throws DateMalformedStringException
-                 * @throws ReflectionException
-                 */ static fn($data) => EntityHydrator::hydrate($data, static::ENTITY_CLASS), $results);
+                // Use optimized batch hydration instead of array_map
+                return EntityHydrator::hydrateAll($results, static::ENTITY_CLASS);
             }
             return $results;
         } catch (Exception $e) {
             $this->logger->error($e->getMessage());
             return [];
+        }
+    }
+
+    /**
+     * Generator-based findBy for memory-efficient processing of large datasets.
+     * Yields entities one at a time instead of loading all into memory.
+     *
+     * @return \Generator<object>
+     */
+    public function iterateBy(array|string|null $criteria = null, array|string|null $orderBy = null, int|null $limit = null, int|null $offset = null, array|string|null $fields = null, bool $hydrate = true): \Generator
+    {
+        try {
+            $rows = $this->connection->selectIterator($this->getTableName(), $fields, $criteria, $orderBy, $limit, $offset);
+
+            if ($hydrate) {
+                yield from EntityHydrator::hydrateIterator($rows, static::ENTITY_CLASS);
+            } else {
+                yield from $rows;
+            }
+        } catch (Exception $e) {
+            $this->logger->error($e->getMessage());
         }
     }
 

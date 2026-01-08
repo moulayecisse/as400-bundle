@@ -195,6 +195,67 @@ readonly class As400Connection implements ConnectionInterface
     }
 
     /**
+     * Generator-based fetch for memory-efficient processing of large datasets.
+     * Yields one row at a time instead of loading all into memory.
+     *
+     * @param string $query SQL query to execute
+     * @param array|null $params Query parameters
+     * @param int $chunkSize Number of rows to fetch per iteration (for buffering)
+     * @return \Generator<array<string, mixed>>
+     * @throws As400Exception
+     */
+    public function fetchIterator(string $query, array|null $params = null, int $chunkSize = 100): \Generator
+    {
+        $queryIndex = $this->queryLogger->startQuery($query, $params ?? []);
+
+        try {
+            $stmt = $this->connection->prepare($query);
+            $stmt->execute($params);
+
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                yield As400Utility::cleanAS400Row($row);
+            }
+
+            $this->queryLogger->stopQuery($queryIndex);
+        } catch (PDOException $e) {
+            $this->queryLogger->stopQuery($queryIndex);
+            throw new As400Exception('Fetch iterator operation failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Select with generator-based streaming for large datasets.
+     *
+     * @return \Generator<array<string, mixed>>
+     * @throws As400Exception
+     */
+    public function selectIterator(
+        string            $table,
+        array|string|null $fields = null,
+        array|string|null $conditions = null,
+        array|string|null $orders = null,
+        int|null          $limit = null,
+        int|null          $offset = null,
+    ): \Generator
+    {
+        [$whereClause, $params] = $this->buildWhereClause($conditions);
+
+        $fieldsStr = match (true) {
+            is_array($fields) => implode(', ', $fields),
+            is_string($fields) => $fields,
+            default => '*'
+        };
+
+        $orderQuery = $this->buildOrderClause($orders);
+        $limitQuery = $limit ? " LIMIT $limit" : '';
+        $offsetQuery = $offset ? " OFFSET $offset" : '';
+
+        $query = "SELECT $fieldsStr FROM $table$whereClause$orderQuery$limitQuery$offsetQuery";
+
+        yield from $this->fetchIterator($query, $params);
+    }
+
+    /**
      * @throws As400Exception
      */
     public function fetchColumn(string $query, array|null $params = null): string|int|null

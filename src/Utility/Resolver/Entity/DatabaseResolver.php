@@ -9,6 +9,13 @@ class DatabaseResolver
     private static ?array $schemaMapping = null;
 
     /**
+     * Cache for resolved database names (after schema mapping).
+     *
+     * @var array<string, string>
+     */
+    private static array $cache = [];
+
+    /**
      * Set the schema mapping configuration.
      * This allows remapping logical schema names to physical ones (e.g., DICADCDE => ICADCDE).
      *
@@ -17,6 +24,8 @@ class DatabaseResolver
     public static function setSchemaMapping(array $mapping): void
     {
         self::$schemaMapping = $mapping;
+        // Clear cache when mapping changes
+        self::$cache = [];
     }
 
     /**
@@ -36,13 +45,29 @@ class DatabaseResolver
      */
     public static function resolve(object|string $entityOrClass): string
     {
-        $database = ArgumentsResolver::resolve($entityOrClass)['database'] ?? '';
+        $className = is_string($entityOrClass) ? $entityOrClass : $entityOrClass::class;
+
+        if (isset(self::$cache[$className])) {
+            return self::$cache[$className];
+        }
+
+        $database = ArgumentsResolver::resolve($className)['database'] ?? '';
 
         // Apply schema mapping if available
         if (self::$schemaMapping !== null && isset(self::$schemaMapping[$database])) {
-            return self::$schemaMapping[$database];
+            $database = self::$schemaMapping[$database];
         }
 
+        self::$cache[$className] = $database;
+
         return $database;
+    }
+
+    /**
+     * Clear the cache (useful for testing).
+     */
+    public static function clearCache(): void
+    {
+        self::$cache = [];
     }
 }
