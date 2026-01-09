@@ -13,6 +13,12 @@ use SensitiveParameter;
 
 readonly class As400Connection implements ConnectionInterface
 {
+    private const PDO_OPTIONS = [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_AUTOCOMMIT => false,
+        PDO::ATTR_TIMEOUT => 30,
+    ];
+
     public PDO $connection;
 
     public function __construct(
@@ -50,7 +56,7 @@ readonly class As400Connection implements ConnectionInterface
         $query = "INSERT INTO $table ($fields) VALUES ($placeholders)";
 
         $result = $this->executeWithTransaction($query, $values);
-        if ($result && count($this->dataRecorder->getRecorders())) {
+        if ($result && $this->hasRecorders()) {
             $this->dataRecorder->insert($table, $data);
         }
 
@@ -72,7 +78,7 @@ readonly class As400Connection implements ConnectionInterface
         $values = [];
 
         foreach ($data as $field => $value) {
-            if (is_string($value) && str_contains($value, 'SELECT ')) {
+            if ($this->isSubquery($value)) {
                 $setStatements[] = "$field = $value";
             } else {
                 $setStatements[] = "$field = ?";
@@ -86,7 +92,7 @@ readonly class As400Connection implements ConnectionInterface
         $params = array_merge($values, $conditionParams);
 
         $oldData = [];
-        if (count($this->dataRecorder->getRecorders())){
+        if ($this->hasRecorders()) {
             $oldData = $this->select($table, array_keys($data), $conditions);
             if (count($oldData) === 1) {
                 $oldData = $oldData[0];
@@ -96,7 +102,7 @@ readonly class As400Connection implements ConnectionInterface
         }
         $result = $this->executeWithTransaction($query, $params);
 
-        if ($result && count($this->dataRecorder->getRecorders())) {
+        if ($result && $this->hasRecorders()) {
             $this->dataRecorder->update($table, $data, $oldData, $conditions);
         }
 
@@ -112,10 +118,10 @@ readonly class As400Connection implements ConnectionInterface
 
         $query = "DELETE FROM $table$whereClause";
 
-        $this->queryLogger->logQuery($query, $params);
+        $queryIndex = $this->queryLogger->startQuery($query, $params);
         $oldData = [];
 
-        if (count($this->dataRecorder->getRecorders())){
+        if ($this->hasRecorders()) {
             $oldData = $this->select($table, null, $conditions);
         }
 
@@ -128,8 +134,9 @@ readonly class As400Connection implements ConnectionInterface
 
             if ($result && $affectedRows > 0) {
                 $this->connection->commit();
+                $this->queryLogger->stopQuery($queryIndex);
 
-                if (count($this->dataRecorder->getRecorders())) {
+                if ($this->hasRecorders()) {
                     $this->dataRecorder->delete($table, $oldData, $conditions);
                 }
 
@@ -137,11 +144,13 @@ readonly class As400Connection implements ConnectionInterface
             }
 
             $this->connection->rollBack();
+            $this->queryLogger->stopQuery($queryIndex);
             return false;
         } catch (PDOException $e) {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();
             }
+            $this->queryLogger->stopQuery($queryIndex);
             throw new As400Exception('Delete operation failed: ' . $e->getMessage());
         }
     }
@@ -154,23 +163,11 @@ readonly class As400Connection implements ConnectionInterface
         array|string|null $fields = null,
         array|string|null $conditions = null,
         array|string|null $orders = null,
-        int|null          $limit = null,
-        int|null          $offset = null,
+        ?int              $limit = null,
+        ?int              $offset = null,
     ): array
     {
-        [$whereClause, $params] = $this->buildWhereClause($conditions);
-
-        $fieldsStr = match (true) {
-            is_array($fields) => implode(', ', $fields),
-            is_string($fields) => $fields,
-            default => '*'
-        };
-
-        $orderQuery = $this->buildOrderClause($orders);
-        $limitQuery = $limit ? " LIMIT $limit" : '';
-        $offsetQuery = $offset ? " OFFSET $offset" : '';
-
-        $query = "SELECT $fieldsStr FROM $table$whereClause$orderQuery$limitQuery$offsetQuery";
+        [$query, $params] = $this->buildSelectQuery($table, $fields, $conditions, $orders, $limit, $offset);
 
         return $this->fetchAll($query, $params);
     }
@@ -200,11 +197,10 @@ readonly class As400Connection implements ConnectionInterface
      *
      * @param string $query SQL query to execute
      * @param array|null $params Query parameters
-     * @param int $chunkSize Number of rows to fetch per iteration (for buffering)
      * @return \Generator<array<string, mixed>>
      * @throws As400Exception
      */
-    public function fetchIterator(string $query, array|null $params = null, int $chunkSize = 100): \Generator
+    public function fetchIterator(string $query, array|null $params = null): \Generator
     {
         $queryIndex = $this->queryLogger->startQuery($query, $params ?? []);
 
@@ -234,23 +230,11 @@ readonly class As400Connection implements ConnectionInterface
         array|string|null $fields = null,
         array|string|null $conditions = null,
         array|string|null $orders = null,
-        int|null          $limit = null,
-        int|null          $offset = null,
+        ?int              $limit = null,
+        ?int              $offset = null,
     ): \Generator
     {
-        [$whereClause, $params] = $this->buildWhereClause($conditions);
-
-        $fieldsStr = match (true) {
-            is_array($fields) => implode(', ', $fields),
-            is_string($fields) => $fields,
-            default => '*'
-        };
-
-        $orderQuery = $this->buildOrderClause($orders);
-        $limitQuery = $limit ? " LIMIT $limit" : '';
-        $offsetQuery = $offset ? " OFFSET $offset" : '';
-
-        $query = "SELECT $fieldsStr FROM $table$whereClause$orderQuery$limitQuery$offsetQuery";
+        [$query, $params] = $this->buildSelectQuery($table, $fields, $conditions, $orders, $limit, $offset);
 
         yield from $this->fetchIterator($query, $params);
     }
@@ -314,31 +298,67 @@ readonly class As400Connection implements ConnectionInterface
         $this->connect();
     }
 
+    private function hasRecorders(): bool
+    {
+        return count($this->dataRecorder->getRecorders()) > 0;
+    }
+
+    private function isSubquery(mixed $value): bool
+    {
+        return is_string($value) && preg_match('/^\s*\(\s*SELECT\s/i', $value);
+    }
+
+    private function buildSelectQuery(
+        string            $table,
+        array|string|null $fields,
+        array|string|null $conditions,
+        array|string|null $orders,
+        ?int              $limit,
+        ?int              $offset,
+    ): array
+    {
+        [$whereClause, $params] = $this->buildWhereClause($conditions);
+
+        $fieldsStr = match (true) {
+            is_array($fields) => implode(', ', $fields),
+            is_string($fields) => $fields,
+            default => '*'
+        };
+
+        $orderQuery = $this->buildOrderClause($orders);
+        $offsetQuery = $offset ? " OFFSET $offset ROWS" : '';
+        $limitQuery = $limit ? " FETCH FIRST $limit ROWS ONLY" : '';
+
+        $query = "SELECT $fieldsStr FROM $table$whereClause$orderQuery$offsetQuery$limitQuery";
+
+        return [$query, $params];
+    }
+
     /**
      * @throws As400Exception
      */
     private function connect(): void
     {
-        $dsn = "odbc:DRIVER=$this->driver;" .
-            "SYSTEM=$this->system;" .
-            "CommitMode=$this->commitMode;" .
-            "ExtendedDynamic=$this->extendedDynamic;" .
-            "PackageLibrary=$this->packageLibrary;" .
-            "TranslateHex=$this->translateHex";
+        $dsnParts = [
+            "DRIVER=$this->driver",
+            "SYSTEM=$this->system",
+            "CommitMode=$this->commitMode",
+            "ExtendedDynamic=$this->extendedDynamic",
+            "PackageLibrary=$this->packageLibrary",
+            "TranslateHex=$this->translateHex",
+        ];
 
         if ($this->database) {
-            $dsn .= ";DATABASE=$this->database";
+            $dsnParts[] = "DATABASE=$this->database";
         }
         if ($this->defaultLibraries) {
-            $dsn .= ";DefaultLibraries=$this->defaultLibraries";
+            $dsnParts[] = "DefaultLibraries=$this->defaultLibraries";
         }
 
+        $dsn = 'odbc:' . implode(';', $dsnParts);
+
         try {
-            $this->connection = new PDO($dsn, $this->user, $this->password, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_AUTOCOMMIT => false,
-                PDO::ATTR_TIMEOUT => 30,
-            ]);
+            $this->connection = new PDO($dsn, $this->user, $this->password, self::PDO_OPTIONS);
         } catch (PDOException $e) {
             throw new As400Exception('Database connection error: ' . $e->getMessage());
         }
@@ -349,7 +369,7 @@ readonly class As400Connection implements ConnectionInterface
      */
     public function executeWithTransaction(string $query, array $params = []): bool
     {
-        $this->queryLogger->logQuery($query, $params);
+        $queryIndex = $this->queryLogger->startQuery($query, $params);
 
         try {
             $this->connection->beginTransaction();
@@ -359,15 +379,18 @@ readonly class As400Connection implements ConnectionInterface
 
             if ($result) {
                 $this->connection->commit();
+                $this->queryLogger->stopQuery($queryIndex);
                 return true;
             }
 
             $this->connection->rollBack();
+            $this->queryLogger->stopQuery($queryIndex);
             return false;
         } catch (PDOException $e) {
             if ($this->connection->inTransaction()) {
                 $this->connection->rollBack();
             }
+            $this->queryLogger->stopQuery($queryIndex);
             throw new As400Exception("Database operation failed: {$e->getMessage()}");
         }
     }
@@ -438,8 +461,8 @@ readonly class As400Connection implements ConnectionInterface
         $placeholders = [];
         $values = [];
 
-        foreach ($data as $field => $value) {
-            if (is_string($value) && str_contains($value, 'SELECT ')) {
+        foreach ($data as $value) {
+            if ($this->isSubquery($value)) {
                 $placeholders[] = $value;
             } else {
                 $placeholders[] = '?';
